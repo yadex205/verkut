@@ -35,7 +35,7 @@ const scanSections = (handler: ArrayBufferHandler) => {
   return sections;
 };
 
-export const parseHapRawFrame = (buffer: ArrayBuffer) => {
+export const parseHapFrame = (buffer: ArrayBuffer) => {
   const handler = new ArrayBufferHandler(buffer, true);
   const sections = scanSections(handler);
 
