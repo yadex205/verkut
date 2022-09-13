@@ -8,9 +8,10 @@ describe("parseQtContainer", () => {
       const parseResult = await parseQtContainer(videoFile);
 
       const sampleSizes = parseResult.movie.tracks[0].media.videoMediaInformation.sampleTable.sampleSizes;
+      console.log(sampleSizes);
       console.log(
-        sampleSizes.slice(0, 10).reduce((prev, current) => prev + current, 0),
-        sampleSizes.slice(0, 11).reduce((prev, current) => prev + current, 0)
+        sampleSizes.slice(0, 20).reduce((prev, current) => prev + current, 0),
+        sampleSizes.slice(0, 21).reduce((prev, current) => prev + current, 0)
       );
 
       expect(parseResult.fileTypeCompatibility.majorBrand).to.equal("qt  ");

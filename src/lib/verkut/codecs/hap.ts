@@ -24,6 +24,8 @@ export const parseHapFrame = (buffer: ArrayBuffer) => {
   const handler = new ArrayBufferHandler(buffer, true);
   const { sectionType, getBodyHandler } = scanSectionHeader(handler);
 
+  console.log(sectionType);
+
   switch (sectionType & 0xf0) {
     case 0xa0:
       return getBodyHandler().arrayBuffer;
