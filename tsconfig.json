@@ -1,0 +1,24 @@
+{
+  "include": ["src/**/*.ts", "spec/**/*.ts"],
+  "exclude": ["node_modules"],
+  "compilerOptions": {
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "~verkut": ["./src/lib/verkut"],
+      "~verkut/*": ["./src/lib/verkut/*"]
+    },
+    "module": "esnext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["esnext", "dom"],
+    "target": "esnext"
+  }
+}
