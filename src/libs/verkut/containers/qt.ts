@@ -1,3 +1,4 @@
+import { ContainerBase, NormalizedContainerMetadata } from "~verkut/containers/container-base";
 import { ArrayBufferHandler } from "~verkut/utils/array-buffer-handler";
 
 interface VideoSampleDescription {
@@ -34,7 +35,7 @@ interface DataInformation {
   }[];
 }
 
-interface QtContainer {
+interface QtContainerMetadata {
   fileTypeCompatibility: {
     majorBrand: string;
     minorVersion: number;
@@ -202,7 +203,7 @@ const parseDataReferenceAtomBody = (handler: ArrayBufferHandler) => {
 };
 
 const parseEditAtomBody = async (file: Blob, start: number, end: number) => {
-  let edits: QtContainer["movie"]["tracks"][number]["edits"] = [];
+  let edits: QtContainerMetadata["movie"]["tracks"][number]["edits"] = [];
 
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "elst") {
@@ -240,7 +241,7 @@ const parseHandlerReferenceAtomBody = (handler: ArrayBufferHandler) => ({
 });
 
 const parseMediaAtomBody = async (file: Blob, start: number, end: number) => {
-  const media: Partial<QtContainer["movie"]["tracks"][number]["media"]> = {};
+  const media: Partial<QtContainerMetadata["movie"]["tracks"][number]["media"]> = {};
 
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "mdhd") {
@@ -263,7 +264,7 @@ const parseMediaAtomBody = async (file: Blob, start: number, end: number) => {
     throw "Missing required atoms";
   }
 
-  return media as QtContainer["movie"]["tracks"][number]["media"];
+  return media as QtContainerMetadata["movie"]["tracks"][number]["media"];
 };
 
 const parseMediaHeaderAtomBody = (handler: ArrayBufferHandler) => ({
@@ -276,7 +277,7 @@ const parseMediaHeaderAtomBody = (handler: ArrayBufferHandler) => ({
 });
 
 const parseMovieAtomBody = async (file: Blob, start: number, end: number) => {
-  const movie: Partial<QtContainer["movie"]> = {
+  const movie: Partial<QtContainerMetadata["movie"]> = {
     tracks: [],
   };
 
@@ -294,7 +295,7 @@ const parseMovieAtomBody = async (file: Blob, start: number, end: number) => {
     throw "Missing required atoms";
   }
 
-  return movie as QtContainer["movie"];
+  return movie as QtContainerMetadata["movie"];
 };
 
 const parseMovieHeaderAtomBody = (handler: ArrayBufferHandler) => ({
@@ -344,7 +345,8 @@ const parseSampleSizeAtomBody = (handler: ArrayBufferHandler) =>
   });
 
 const parseSampleTableAtomBody = async (file: Blob, start: number, end: number, mediaType: string) => {
-  const sampleTable: Partial<QtContainer["movie"]["tracks"][number]["media"]["videoMediaInformation"]["sampleTable"]> = {};
+  const sampleTable: Partial<QtContainerMetadata["movie"]["tracks"][number]["media"]["videoMediaInformation"]["sampleTable"]> =
+    {};
 
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "stsd") {
@@ -371,7 +373,7 @@ const parseSampleTableAtomBody = async (file: Blob, start: number, end: number, 
     throw "Missing required atoms";
   }
 
-  return sampleTable as QtContainer["movie"]["tracks"][number]["media"]["videoMediaInformation"]["sampleTable"];
+  return sampleTable as QtContainerMetadata["movie"]["tracks"][number]["media"]["videoMediaInformation"]["sampleTable"];
 };
 
 const parseSampleToChunkAtomBody = (handler: ArrayBufferHandler) =>
@@ -388,7 +390,7 @@ const parseTimeToSampleAtomBody = (handler: ArrayBufferHandler) =>
   }));
 
 const parseTrackAtomBody = async (file: Blob, start: number, end: number) => {
-  const track: Partial<QtContainer["movie"]["tracks"][number]> = {};
+  const track: Partial<QtContainerMetadata["movie"]["tracks"][number]> = {};
 
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "tkhd") {
@@ -406,7 +408,7 @@ const parseTrackAtomBody = async (file: Blob, start: number, end: number) => {
     throw "Missing required atoms";
   }
 
-  return track as QtContainer["movie"]["tracks"][number];
+  return track as QtContainerMetadata["movie"]["tracks"][number];
 };
 
 const parseTrackHeaderAtomBody = (handler: ArrayBufferHandler) => ({
@@ -423,7 +425,7 @@ const parseTrackHeaderAtomBody = (handler: ArrayBufferHandler) => ({
 });
 
 const parseVideoMediaInformationAtomBody = async (file: Blob, start: number, end: number, mediaType: string) => {
-  const videoMediaInformation: Partial<QtContainer["movie"]["tracks"][number]["media"]["videoMediaInformation"]> = {};
+  const videoMediaInformation: Partial<QtContainerMetadata["movie"]["tracks"][number]["media"]["videoMediaInformation"]> = {};
 
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "vmhd") {
@@ -452,7 +454,7 @@ const parseVideoMediaInformationAtomBody = async (file: Blob, start: number, end
     throw "Missing requried atoms";
   }
 
-  return videoMediaInformation as QtContainer["movie"]["tracks"][number]["media"]["videoMediaInformation"];
+  return videoMediaInformation as QtContainerMetadata["movie"]["tracks"][number]["media"]["videoMediaInformation"];
 };
 
 const parseVideoMediaInformationHeaderAtomBody = (handler: ArrayBufferHandler) => ({
@@ -505,8 +507,8 @@ const parseVideoMediaDescriptionExtensions = (handler: ArrayBufferHandler) => {
   return extensions;
 };
 
-export const parseQtContainer = async (file: Blob) => {
-  const container: Partial<QtContainer> = {};
+export const parseQtContainerMetadata = async (file: Blob) => {
+  const container: Partial<QtContainerMetadata> = {};
 
   for await (const atom of scanAtoms(file)) {
     if (atom.atomType === "ftyp") {
@@ -527,5 +529,31 @@ export const parseQtContainer = async (file: Blob) => {
     throw "Missing required atoms";
   }
 
-  return container as QtContainer;
+  return container as QtContainerMetadata;
 };
+
+export class QtContainer extends ContainerBase {
+  protected parseFile = async (file: Blob): Promise<NormalizedContainerMetadata> => {
+    const metadata = await parseQtContainerMetadata(file);
+
+    const videoTrack = metadata.movie.tracks.find((track) => track.media.handlerReference?.componentSubType === "vide");
+
+    if (!videoTrack) {
+      throw "No video track";
+    }
+
+    if (videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions.length > 1) {
+      throw "Cannot handle a track with multiple codecs";
+    } else if (videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions.length === 0) {
+      throw "Cannot ";
+    }
+
+    return {
+      video: {
+        codec: videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions[0].dataFormat,
+        width: videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions[0].width,
+        height: videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions[0].height,
+      },
+    };
+  };
+}

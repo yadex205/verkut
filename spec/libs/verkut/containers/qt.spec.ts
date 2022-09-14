@@ -6,13 +6,9 @@ describe("parseQtContainer", () => {
     it("returns file type compatibility information", async () => {
       const videoFile = await (await fetch("/spec/samples/hap.mov")).blob();
       const parseResult = await parseQtContainer(videoFile);
-
-      const sampleSizes = parseResult.movie.tracks[0].media.videoMediaInformation.sampleTable.sampleSizes;
-      console.log(sampleSizes);
-      console.log(
-        sampleSizes.slice(0, 20).reduce((prev, current) => prev + current, 0),
-        sampleSizes.slice(0, 21).reduce((prev, current) => prev + current, 0)
-      );
+      console.log(parseResult.movie.tracks[0].edits);
+      console.log(parseResult.movie.tracks[0].media);
+      console.log(parseResult.movie.tracks[0].media.videoMediaInformation.sampleTable);
 
       expect(parseResult.fileTypeCompatibility.majorBrand).to.equal("qt  ");
       expect(parseResult.fileTypeCompatibility.minorVersion).to.equal(512);
