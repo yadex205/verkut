@@ -45,13 +45,15 @@ describe("decodeVideoFrame", () => {
         throw "Cannot obtain S3TC extension";
       }
 
-      gl.viewport(0, 0, 1280, 720);
-      gl.clearColor(1, 0, 1, 0);
+      // gl.viewport(0, 0, 1280, 720);
+      gl.clearColor(0.5, 0.5, 0.5, 1.0);
+      gl.clearDepth(1.0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
       // gl.enable(gl.CULL_FACE);
       // gl.cullFace(gl.FRONT_AND_BACK);
+      gl.activeTexture(gl.TEXTURE0);
 
       const program = gl.createProgram();
       const vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -73,8 +75,12 @@ describe("decodeVideoFrame", () => {
       const textureCoordAttributeLocation = gl.getAttribLocation(program, "textureCoord");
       const textureUniformLocation = gl.getUniformLocation(program, "texture");
 
-      const vertices = [-0.6, 0.6, 0.6, 0.6, -0.6, -0.6, 0.6, -0.6];
-      const textureCoord = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
+      if (!textureUniformLocation) {
+        throw "Cannot obtain uniform location";
+      }
+
+      const vertices = [-0.6, -0.6, -0.8, 0.8, 0.8, 0.8, 0.6, -0.6];
+      const textureCoord = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0];
 
       const verticesVbo = gl.createBuffer();
       const textureCoordVbo = gl.createBuffer();
@@ -115,11 +121,10 @@ describe("decodeVideoFrame", () => {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       // T 座標のラッピング (繰り返し) を禁止
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform1i(textureUniformLocation, 0);
-      gl.bindTexture(gl.TEXTURE_2D, null);
 
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
       gl.flush();
     });
   });

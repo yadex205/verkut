@@ -10,8 +10,8 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "~verkut": ["./src/lib/verkut"],
-      "~verkut/*": ["./src/lib/verkut/*"]
+      "~verkut": ["./src/libs/verkut"],
+      "~verkut/*": ["./src/libs/verkut/*"]
     },
     "module": "esnext",
     "moduleResolution": "node",
