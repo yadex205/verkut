@@ -19,6 +19,7 @@ await esbuild.build({
   outfile: join(__dirname, "../tmp/test/libs/verkut/codecs/hap.spec.js"),
   bundle: true,
   logLevel: "info",
+  sourcemap: "inline",
   watch: options.watch,
 });
 
@@ -27,5 +28,6 @@ await esbuild.build({
   outfile: join(__dirname, "../tmp/test/libs/verkut/containers/qt.spec.js"),
   bundle: true,
   logLevel: "info",
+  sourcemap: "inline",
   watch: options.watch,
 });

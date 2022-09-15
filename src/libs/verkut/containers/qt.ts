@@ -1,6 +1,8 @@
 import { ContainerBase, NormalizedContainerMetadata } from "~verkut/containers/container-base";
 import { ArrayBufferHandler } from "~verkut/utils/array-buffer-handler";
 
+const loggerPrefix = "[verkut/containers/qt]";
+
 interface VideoSampleDescription {
   dataFormat: string;
   dataReferenceIndex: number;
@@ -179,8 +181,9 @@ const parseDataInformationAtomBody = async (file: Blob, start: number, end: numb
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "dref") {
       dataInformation.dataReferences = parseDataReferenceAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "dref atom", dataInformation.dataReferences);
     } else {
-      console.warn(`Unhandled atom type in Data information atom "${atom.atomType}"`);
+      console.warn(loggerPrefix, `Unhandled atom type in Data information atom "${atom.atomType}"`);
     }
   }
 
@@ -208,8 +211,9 @@ const parseEditAtomBody = async (file: Blob, start: number, end: number) => {
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "elst") {
       edits = parseEditListAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "elst atom", edits);
     } else {
-      console.warn(`Unhandled atom type in Edit atom "${atom.atomType}"`);
+      console.warn(loggerPrefix, `Unhandled atom type in Edit atom "${atom.atomType}"`);
     }
   }
 
@@ -246,22 +250,26 @@ const parseMediaAtomBody = async (file: Blob, start: number, end: number) => {
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "mdhd") {
       media.header = parseMediaHeaderAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "mdhd atom", media.header);
     } else if (atom.atomType === "hdlr") {
       media.handlerReference = parseHandlerReferenceAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "hdlr atom", media.handlerReference);
     } else if (atom.atomType === "minf") {
-      media.videoMediaInformation = await parseVideoMediaInformationAtomBody(
-        file,
-        atom.atomBodyStartsAt,
-        atom.atomBodyEndsAt,
-        media.handlerReference?.componentSubType || ""
-      );
+      if (media.handlerReference?.componentSubType === "vide") {
+        console.debug(loggerPrefix, "minf atom (video media information)");
+        media.videoMediaInformation = await parseVideoMediaInformationAtomBody(
+          file,
+          atom.atomBodyStartsAt,
+          atom.atomBodyEndsAt
+        );
+      }
     } else {
-      console.warn(`Unhandled atom type in Media atom "${atom.atomType}"`);
+      console.warn(loggerPrefix, `Unhandled atom type in Media atom "${atom.atomType}"`);
     }
   }
 
   if (!media.header) {
-    throw "Missing required atoms";
+    throw `${loggerPrefix} Missing required atoms in Media atom`;
   }
 
   return media as QtContainerMetadata["movie"]["tracks"][number]["media"];
@@ -284,15 +292,17 @@ const parseMovieAtomBody = async (file: Blob, start: number, end: number) => {
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "mvhd") {
       movie.header = parseMovieHeaderAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "mvhd atom", movie.header);
     } else if (atom.atomType === "trak") {
       movie?.tracks?.push(await parseTrackAtomBody(file, atom.atomBodyStartsAt, atom.atomBodyEndsAt));
+      console.debug(loggerPrefix, "trak atom");
     } else {
-      console.warn(`Unhandled atom type in Movie atom "${atom.atomType}"`);
+      console.warn(loggerPrefix, `Unhandled atom type in Movie atom "${atom.atomType}"`);
     }
   }
 
   if (!movie.header || !movie.tracks || movie.tracks.length === 0) {
-    throw "Missing required atoms";
+    throw `${loggerPrefix} Missing required atoms in Movie atom`;
   }
 
   return movie as QtContainerMetadata["movie"];
@@ -330,7 +340,7 @@ const parseSampleDescriptionAtomBody = (handler: ArrayBufferHandler, mediaType: 
     if (mediaType === "vide") {
       sampleDescriptions.push(parseVideoMediaDescription(sampleDescriptionHandler));
     } else {
-      console.warn(`Unhandled media type in Sample description atom "${mediaType}"`);
+      console.warn(loggerPrefix, `Unhandled media type in Sample description atom "${mediaType}"`);
     }
 
     sampleDescriptionStartsAt += sampleDescriptionSize;
@@ -339,10 +349,18 @@ const parseSampleDescriptionAtomBody = (handler: ArrayBufferHandler, mediaType: 
   return sampleDescriptions;
 };
 
-const parseSampleSizeAtomBody = (handler: ArrayBufferHandler) =>
-  new Array(handler.getUint32(8)).fill(null).map((_, index) => {
-    return handler.getUint32(12 + index * 4);
-  });
+const parseSampleSizeAtomBody = (handler: ArrayBufferHandler) => {
+  const fixedSampleSize = handler.getUint32(4);
+  const numberOfEntries = handler.getUint32(8);
+
+  if (fixedSampleSize !== 0) {
+    return new Array(numberOfEntries).fill(fixedSampleSize);
+  } else {
+    return new Array(numberOfEntries).fill(null).map((_, index) => {
+      return handler.getUint32(12 + index * 4);
+    });
+  }
+};
 
 const parseSampleTableAtomBody = async (file: Blob, start: number, end: number, mediaType: string) => {
   const sampleTable: Partial<QtContainerMetadata["movie"]["tracks"][number]["media"]["videoMediaInformation"]["sampleTable"]> =
@@ -351,16 +369,21 @@ const parseSampleTableAtomBody = async (file: Blob, start: number, end: number, 
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "stsd") {
       sampleTable.sampleDescriptions = parseSampleDescriptionAtomBody(await atom.getAtomBodyHandler(), mediaType);
+      console.debug(loggerPrefix, "stsd atom", sampleTable.sampleDescriptions);
     } else if (atom.atomType === "stts") {
       sampleTable.timeToSamples = parseTimeToSampleAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "stts atom", sampleTable.timeToSamples);
     } else if (atom.atomType === "stsc") {
       sampleTable.sampleToChunks = parseSampleToChunkAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "stsc atom", sampleTable.sampleToChunks);
     } else if (atom.atomType === "stsz") {
       sampleTable.sampleSizes = parseSampleSizeAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "stsz atom", sampleTable.sampleSizes);
     } else if (atom.atomType === "stco") {
       sampleTable.chunkOffsets = parseChunkOffsetAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "stco atom", sampleTable.chunkOffsets);
     } else {
-      console.warn(`Unhandled atom type in Sample table atom "${atom.atomType}"`);
+      console.warn(loggerPrefix, `Unhandled atom type in Sample table atom "${atom.atomType}"`);
     }
   }
 
@@ -370,7 +393,7 @@ const parseSampleTableAtomBody = async (file: Blob, start: number, end: number, 
     !sampleTable.sampleToChunks ||
     !sampleTable.sampleSizes
   ) {
-    throw "Missing required atoms";
+    throw `${loggerPrefix} Missing required atoms in Sample table atom`;
   }
 
   return sampleTable as QtContainerMetadata["movie"]["tracks"][number]["media"]["videoMediaInformation"]["sampleTable"];
@@ -395,17 +418,20 @@ const parseTrackAtomBody = async (file: Blob, start: number, end: number) => {
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "tkhd") {
       track.header = parseTrackHeaderAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "tkhd atom", track.header);
     } else if (atom.atomType === "edts") {
+      console.debug(loggerPrefix, "edts atom");
       track.edits = await parseEditAtomBody(file, atom.atomBodyStartsAt, atom.atomBodyEndsAt);
     } else if (atom.atomType === "mdia") {
+      console.debug(loggerPrefix, "mdia atom");
       track.media = await parseMediaAtomBody(file, atom.atomBodyStartsAt, atom.atomBodyEndsAt);
     } else {
-      console.warn(`Unhandled atom type in Track atom "${atom.atomType}"`);
+      console.warn(loggerPrefix, `Unhandled atom type in Track atom "${atom.atomType}"`);
     }
   }
 
   if (!track.header || !track.media) {
-    throw "Missing required atoms";
+    throw `${loggerPrefix} Missing required atoms in Track atom`;
   }
 
   return track as QtContainerMetadata["movie"]["tracks"][number];
@@ -424,34 +450,38 @@ const parseTrackHeaderAtomBody = (handler: ArrayBufferHandler) => ({
   trackHeight: handler.getUfix32(80),
 });
 
-const parseVideoMediaInformationAtomBody = async (file: Blob, start: number, end: number, mediaType: string) => {
+const parseVideoMediaInformationAtomBody = async (file: Blob, start: number, end: number) => {
   const videoMediaInformation: Partial<QtContainerMetadata["movie"]["tracks"][number]["media"]["videoMediaInformation"]> = {};
 
   for await (const atom of scanAtoms(file, start, end)) {
     if (atom.atomType === "vmhd") {
       videoMediaInformation.header = parseVideoMediaInformationHeaderAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "vmhd atom", videoMediaInformation.header);
     } else if (atom.atomType === "hdlr") {
       videoMediaInformation.handlerReference = parseHandlerReferenceAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "hdlr atom", videoMediaInformation.handlerReference);
     } else if (atom.atomType === "dinf") {
+      console.debug(loggerPrefix, "dinf atom");
       videoMediaInformation.dataInformation = await parseDataInformationAtomBody(
         file,
         atom.atomBodyStartsAt,
         atom.atomBodyEndsAt
       );
     } else if (atom.atomType === "stbl") {
+      console.debug(loggerPrefix, "stbl atom");
       videoMediaInformation.sampleTable = await parseSampleTableAtomBody(
         file,
         atom.atomBodyStartsAt,
         atom.atomBodyEndsAt,
-        mediaType
+        "vide"
       );
     } else {
-      console.warn(`Unhandled atom type in Video media information atom "${atom.atomType}"`);
+      console.warn(loggerPrefix, `Unhandled atom type in Video media information atom "${atom.atomType}"`);
     }
   }
 
   if (!videoMediaInformation.header || !videoMediaInformation.handlerReference) {
-    throw "Missing requried atoms";
+    throw `${loggerPrefix} Missing required atoms in Video media information atom`;
   }
 
   return videoMediaInformation as QtContainerMetadata["movie"]["tracks"][number]["media"]["videoMediaInformation"];
@@ -498,7 +528,7 @@ const parseVideoMediaDescriptionExtensions = (handler: ArrayBufferHandler) => {
         fieldOrdering: extensionBodyHandler.getUint8(1),
       };
     } else {
-      console.warn(`Unhandled extension in Video media description "${extensionType}"`);
+      console.warn(loggerPrefix, `Unhandled extension in Video media description "${extensionType}"`);
     }
 
     extensionStartsAt += extensionSize;
@@ -513,20 +543,23 @@ export const parseQtContainerMetadata = async (file: Blob) => {
   for await (const atom of scanAtoms(file)) {
     if (atom.atomType === "ftyp") {
       container.fileTypeCompatibility = parseFileTypeCompatibilityAtomBody(await atom.getAtomBodyHandler());
+      console.debug(loggerPrefix, "ftyp atom", container.fileTypeCompatibility);
     } else if (atom.atomType === "mdat") {
+      console.debug(loggerPrefix, "mdat atom");
       container.movieData = {
         startsAt: atom.atomBodyStartsAt,
         endsAt: atom.atomBodyEndsAt,
       };
     } else if (atom.atomType === "moov") {
+      console.debug(loggerPrefix, "moov atom");
       container.movie = await parseMovieAtomBody(file, atom.atomBodyStartsAt, atom.atomBodyEndsAt);
     } else if (atom.atomType !== "wide") {
-      console.warn(`Unhandled atom type in container "${atom.atomType}"`);
+      console.warn(loggerPrefix, `Unhandled atom type in container "${atom.atomType}"`);
     }
   }
 
   if (!container.fileTypeCompatibility || !container.movieData || !container.movie) {
-    throw "Missing required atoms";
+    throw `${loggerPrefix} Missing required atoms in container`;
   }
 
   return container as QtContainerMetadata;
@@ -536,23 +569,29 @@ export class QtContainer extends ContainerBase {
   protected parseFile = async (file: Blob): Promise<NormalizedContainerMetadata> => {
     const metadata = await parseQtContainerMetadata(file);
 
-    const videoTrack = metadata.movie.tracks.find((track) => track.media.handlerReference?.componentSubType === "vide");
+    const videoTracks = metadata.movie.tracks.filter((track) => track.media.handlerReference?.componentSubType === "vide");
 
-    if (!videoTrack) {
-      throw "No video track";
+    if (videoTracks.length === 0) {
+      throw `${loggerPrefix} Missing video track`;
+    } else if (videoTracks.length > 1) {
+      console.warn(loggerPrefix, "Only first video track is used");
     }
 
-    if (videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions.length > 1) {
-      throw "Cannot handle a track with multiple codecs";
-    } else if (videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions.length === 0) {
-      throw "Cannot ";
+    const videoTrack = videoTracks[0];
+    const sampleTable = videoTrack.media.videoMediaInformation.sampleTable;
+
+    if (sampleTable.sampleDescriptions.length === 0) {
+      throw `${loggerPrefix} Missing codec metadata`;
+    } else if (sampleTable.sampleDescriptions.length > 1) {
+      throw `${loggerPrefix} Multiple codecs in a video track is not supported`;
     }
 
     return {
+      duration: metadata.movie.header.duration / metadata.movie.header.timeScale,
       video: {
-        codec: videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions[0].dataFormat,
-        width: videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions[0].width,
-        height: videoTrack.media.videoMediaInformation.sampleTable.sampleDescriptions[0].height,
+        codec: sampleTable.sampleDescriptions[0].dataFormat,
+        width: sampleTable.sampleDescriptions[0].width,
+        height: sampleTable.sampleDescriptions[0].height,
       },
     };
   };

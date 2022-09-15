@@ -1,4 +1,5 @@
 export interface NormalizedContainerMetadata {
+  duration: number;
   video: {
     codec: string;
     width: number;
