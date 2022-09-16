@@ -294,8 +294,8 @@ const parseMovieAtomBody = async (file: Blob, start: number, end: number) => {
       movie.header = parseMovieHeaderAtomBody(await atom.getAtomBodyHandler());
       console.debug(loggerPrefix, "mvhd atom", movie.header);
     } else if (atom.atomType === "trak") {
-      movie?.tracks?.push(await parseTrackAtomBody(file, atom.atomBodyStartsAt, atom.atomBodyEndsAt));
       console.debug(loggerPrefix, "trak atom");
+      movie?.tracks?.push(await parseTrackAtomBody(file, atom.atomBodyStartsAt, atom.atomBodyEndsAt));
     } else {
       console.warn(loggerPrefix, `Unhandled atom type in Movie atom "${atom.atomType}"`);
     }
@@ -517,7 +517,9 @@ const parseVideoMediaDescriptionExtensions = (handler: ArrayBufferHandler) => {
 
   let extensionStartsAt = 0;
 
-  while (extensionStartsAt < handler.size) {
+  // @note Some video sample descriptions contain an optional 4-byte terminator with all bytes set to 0.
+  // @see https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFChap3/qtff3.html#//apple_ref/doc/uid/TP40000939-CH205-74522
+  while (extensionStartsAt < handler.size - 4) {
     const extensionSize = handler.getUint32(extensionStartsAt);
     const extensionType = handler.getAscii(extensionStartsAt + 4, 4);
     const extensionBodyHandler = handler.slice(extensionStartsAt + 8, extensionStartsAt + extensionSize);
@@ -578,20 +580,61 @@ export class QtContainer extends ContainerBase {
     }
 
     const videoTrack = videoTracks[0];
-    const sampleTable = videoTrack.media.videoMediaInformation.sampleTable;
+    const videoSampleTable = videoTrack.media.videoMediaInformation.sampleTable;
 
-    if (sampleTable.sampleDescriptions.length === 0) {
+    if (videoSampleTable.sampleDescriptions.length === 0) {
       throw `${loggerPrefix} Missing codec metadata`;
-    } else if (sampleTable.sampleDescriptions.length > 1) {
+    } else if (videoSampleTable.sampleDescriptions.length > 1) {
       throw `${loggerPrefix} Multiple codecs in a video track is not supported`;
     }
 
+    if (videoSampleTable.sampleDescriptions[0].frameCount > 1) {
+      throw `${loggerPrefix} Multiple frames in a video sample is not supported`;
+    }
+
+    if (videoSampleTable.timeToSamples.length > 1) {
+      throw `${loggerPrefix} Multiple framerate in a video track is not supported`;
+    }
+
+    let frameIndexCounter = 0;
+    const framesMap = videoSampleTable.sampleToChunks.flatMap(({ firstChunk, samplesPerChunk }, index) => {
+      const numberOfSameEntryChunks =
+        index === videoSampleTable.sampleToChunks.length - 1
+          ? videoSampleTable.chunkOffsets.length - firstChunk + 1
+          : videoSampleTable.sampleToChunks[index + 1].firstChunk - firstChunk;
+
+      return new Array(numberOfSameEntryChunks).fill(null).flatMap((_, localChunkIndex) => {
+        const chunkIndex = firstChunk - 1 + localChunkIndex;
+        const chunkStartsAt = videoSampleTable.chunkOffsets[chunkIndex];
+        const frameIndexStartsAt = frameIndexCounter;
+
+        frameIndexCounter += samplesPerChunk;
+
+        return new Array(samplesPerChunk).fill(null).map((_, localFrameIndex) => {
+          const frameIndex = frameIndexStartsAt + localFrameIndex;
+          const frameStartsAt = videoSampleTable.sampleSizes
+            .slice(frameIndexStartsAt, frameIndex)
+            .reduce((sum, size) => sum + size, chunkStartsAt);
+          const frameEndsAt = frameStartsAt + videoSampleTable.sampleSizes[frameIndex];
+
+          return [frameStartsAt, frameEndsAt] as [number, number];
+        });
+      });
+    });
+
     return {
-      duration: metadata.movie.header.duration / metadata.movie.header.timeScale,
-      video: {
-        codec: sampleTable.sampleDescriptions[0].dataFormat,
-        width: sampleTable.sampleDescriptions[0].width,
-        height: sampleTable.sampleDescriptions[0].height,
+      duration: metadata.movie.header.duration,
+      timeScale: metadata.movie.header.timeScale,
+      videoStream: {
+        timeScale: metadata.movie.header.timeScale,
+        streamDuration: videoTrack.media.header.duration,
+        frameDuration: videoSampleTable.timeToSamples[0].sampleDuration,
+        codec: videoSampleTable.sampleDescriptions[0].dataFormat,
+        displayWidth: videoTrack.header.trackWidth,
+        displayHeight: videoTrack.header.trackHeight,
+        frameWidth: videoSampleTable.sampleDescriptions[0].width,
+        frameHeight: videoSampleTable.sampleDescriptions[0].height,
+        framesMap,
       },
     };
   };

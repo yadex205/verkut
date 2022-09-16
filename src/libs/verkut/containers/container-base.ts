@@ -1,21 +1,33 @@
 export interface NormalizedContainerMetadata {
   duration: number;
-  video: {
+  timeScale: number;
+  videoStream: {
+    timeScale: number;
+    streamDuration: number;
+    frameDuration: number;
     codec: string;
-    width: number;
-    height: number;
+    displayWidth: number;
+    displayHeight: number;
+    frameWidth: number;
+    frameHeight: number;
+    framesMap: [number, number][];
   };
 }
 
 export abstract class ContainerBase {
   private file: Blob;
+  private _metadata?: NormalizedContainerMetadata = undefined;
 
   public constructor(file: Blob) {
     this.file = file;
   }
 
+  public get metadata() {
+    return this._metadata;
+  }
+
   public parse = async () => {
-    await this.parseFile(this.file);
+    this._metadata = await this.parseFile(this.file);
   };
 
   protected abstract parseFile(file: Blob): Promise<NormalizedContainerMetadata>;

@@ -1,4 +1,5 @@
 import { parseHapFrame } from "~verkut/codecs/hap";
+import { QtContainer } from "~verkut/containers/qt";
 
 const vertexShaderSource = `
   attribute vec2 position;
@@ -27,9 +28,13 @@ describe("decodeVideoFrame", () => {
   describe("when HAP chunk is given", () => {
     it("returns decoded frame", async () => {
       const videoFile = await (await fetch("/spec/samples/hap.mov")).blob();
-      const rawFrame = await videoFile.slice(1004028 + 36, 1038869 + 36).arrayBuffer();
+      const container = new QtContainer(videoFile);
+      await container.parse();
+
+      const [frameStartsAt, frameEndsAt] = container.metadata?.videoStream?.framesMap?.[15] || [0, 0];
+
+      const rawFrame = await videoFile.slice(frameStartsAt, frameEndsAt).arrayBuffer();
       const textureData = parseHapFrame(rawFrame);
-      console.log(textureData.byteLength);
 
       const canvasEl = document.createElement("canvas");
       canvasEl.width = 1280;
