@@ -7,11 +7,15 @@
     "noImplicitThis": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "strict": true,
     "baseUrl": ".",
     "paths": {
       "~verkut": ["./src/libs/verkut"],
-      "~verkut/*": ["./src/libs/verkut/*"]
+      "~verkut/*": ["./src/libs/verkut/*"],
+      "~verkut-components": ["./src/libs/verkut-components"],
+      "~verkut-components/*": ["./src/libs/verkut-components/*"]
     },
     "module": "esnext",
     "moduleResolution": "node",

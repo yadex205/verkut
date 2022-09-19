@@ -626,7 +626,7 @@ export class QtContainer extends ContainerBase {
       duration: metadata.movie.header.duration,
       timeScale: metadata.movie.header.timeScale,
       videoStream: {
-        timeScale: metadata.movie.header.timeScale,
+        timeScale: videoTrack.media.header.timeScale,
         streamDuration: videoTrack.media.header.duration,
         frameDuration: videoSampleTable.timeToSamples[0].sampleDuration,
         codec: videoSampleTable.sampleDescriptions[0].dataFormat,

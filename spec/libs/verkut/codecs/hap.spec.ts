@@ -50,14 +50,11 @@ describe("decodeVideoFrame", () => {
         throw "Cannot obtain S3TC extension";
       }
 
-      // gl.viewport(0, 0, 1280, 720);
       gl.clearColor(0.5, 0.5, 0.5, 1.0);
       gl.clearDepth(1.0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
-      // gl.enable(gl.CULL_FACE);
-      // gl.cullFace(gl.FRONT_AND_BACK);
       gl.activeTexture(gl.TEXTURE0);
 
       const program = gl.createProgram();
@@ -120,11 +117,8 @@ describe("decodeVideoFrame", () => {
         0,
         new Uint8Array(textureData)
       );
-      // gl.LINEAR の代わりに gl.NEAREST も可能。ミップマップは不可
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      // S 座標のラッピング (繰り返し) を禁止
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      // T 座標のラッピング (繰り返し) を禁止
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform1i(textureUniformLocation, 0);
