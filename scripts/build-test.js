@@ -24,8 +24,8 @@ await esbuild.build({
 });
 
 await esbuild.build({
-  entryPoints: [join(__dirname, "../spec/libs/verkut/containers/qt.spec.ts")],
-  outfile: join(__dirname, "../tmp/test/libs/verkut/containers/qt.spec.js"),
+  entryPoints: [join(__dirname, "../spec/libs/verkut/containers/qt-container.spec.ts")],
+  outfile: join(__dirname, "../tmp/test/libs/verkut/containers/qt-container.spec.js"),
   bundle: true,
   logLevel: "info",
   sourcemap: "inline",
