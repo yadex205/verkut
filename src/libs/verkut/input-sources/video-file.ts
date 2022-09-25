@@ -12,6 +12,9 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   private _canvasEl: HTMLCanvasElement;
   private gl: WebGLRenderingContext;
   private yanvas: Yanvas;
+  private _currentTime = 0;
+  private _duration = 0;
+  private _onFrameUpdate: () => void = () => {};
 
   public constructor() {
     const canvasEl = document.createElement("canvas");
@@ -67,6 +70,18 @@ export class VideoFileInputSource implements IFileInputSourceClass {
     return container.metadata.videoStream.displayHeight;
   }
 
+  public get currentTime() {
+    return this._currentTime;
+  }
+
+  public get duration() {
+    return this._duration;
+  }
+
+  public set onFrameUpdate(func: typeof this._onFrameUpdate) {
+    this._onFrameUpdate = func;
+  }
+
   public loadFile = async (file: Blob) => {
     const ContainerClass = MIME_TYPE_TO_CONTAINER_CLASS_MAP[file.type];
     if (!ContainerClass) {
@@ -89,6 +104,8 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
     this.container = container;
     this.videoDecoder = decoder;
+    this._currentTime = 0;
+    this._duration = container.metadata.duration / container.metadata.timeScale;
   };
 
   public play = () => {
@@ -111,6 +128,8 @@ export class VideoFileInputSource implements IFileInputSourceClass {
       this.render(container, videoDecoder);
 
       frameIndex = (frameIndex + 1) % framesCount;
+      this._currentTime = videoChunk.timestamp / 1000000;
+      this._onFrameUpdate();
     };
     yanvas.fps = fps;
 
