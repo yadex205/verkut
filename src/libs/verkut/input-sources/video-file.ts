@@ -1,39 +1,20 @@
 import { FOUR_CC_TO_DECODER_CLASS_MAP, VideoDecoderClassType } from "~verkut/codecs";
 import { ContainerClassType, MIME_TYPE_TO_CONTAINER_CLASS_MAP } from "~verkut/containers";
 import { IFileInputSourceClass } from "~verkut/input-sources/interfaces";
+import { Yanvas } from "~yanvas";
+import { FlatShader } from "~yanvas/shaders/flat-shader";
 
 const LOGGER_PREFIX = "[verkut/input-sources/video-file]";
-
-const vertexShaderSource = `
-  attribute vec2 position;
-  attribute vec2 textureCoord;
-
-  varying vec2 vTextureCoord;
-
-  void main(void) {
-    vTextureCoord = textureCoord;
-    gl_Position = vec4(position, 0.0, 1.0);
-  }
-`;
-
-const fragmentShaderSource = `
-  precision lowp float;
-
-  uniform sampler2D texture;
-  varying vec2 vTextureCoord;
-
-  void main(void) {
-    gl_FragColor = texture2D(texture, vTextureCoord);
-  }
-`;
 
 export class VideoFileInputSource implements IFileInputSourceClass {
   private container?: InstanceType<ContainerClassType>;
   private videoDecoder?: InstanceType<VideoDecoderClassType>;
   private _canvasEl: HTMLCanvasElement;
   private gl: WebGLRenderingContext;
-  private glCompressedTextureS3tcExtension: WEBGL_compressed_texture_s3tc | null;
-  private timer = 0;
+  private yanvas: Yanvas;
+  private _currentTime = 0;
+  private _duration = 0;
+  private _onFrameUpdate: () => void = () => {};
 
   public constructor() {
     const canvasEl = document.createElement("canvas");
@@ -42,55 +23,13 @@ export class VideoFileInputSource implements IFileInputSourceClass {
       throw `${LOGGER_PREFIX} Cannot obtain WebGL context`;
     }
 
-    gl.clearColor(0.0, 0.0, 0.0, 0.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    const yanvas = new Yanvas(gl);
+    const flatShader = new FlatShader(gl);
 
-    this.glCompressedTextureS3tcExtension = gl.getExtension("WEBGL_compressed_texture_s3tc");
-
-    const program = gl.createProgram();
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    if (!program || !vertexShader || !fragmentShader) {
-      throw `${LOGGER_PREFIX} Cannot prepare WebGL entities`;
-    }
-
-    gl.shaderSource(vertexShader, vertexShaderSource);
-    gl.compileShader(vertexShader);
-    gl.attachShader(program, vertexShader);
-    gl.shaderSource(fragmentShader, fragmentShaderSource);
-    gl.compileShader(fragmentShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    gl.useProgram(program);
-
-    const positionAttributeLocation = gl.getAttribLocation(program, "position");
-    const textureCoordAttributeLocation = gl.getAttribLocation(program, "textureCoord");
-
-    const vertices = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
-    const textureCoord = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0];
-
-    const verticesVbo = gl.createBuffer();
-    const textureCoordVbo = gl.createBuffer();
-    if (!verticesVbo || !textureCoordVbo) {
-      throw "Cannot prepare buffers";
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, verticesVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(positionAttributeLocation);
-    gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoord), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(textureCoordAttributeLocation);
-    gl.vertexAttribPointer(textureCoordAttributeLocation, 2, gl.FLOAT, false, 0, 0);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-    const textureUniformLocation = gl.getUniformLocation(program, "texture");
-    if (!textureUniformLocation) {
-      throw "Cannot obtain uniform location";
-    }
+    flatShader.setVertices(new Float32Array([-1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, -1.0, 0.0]));
+    flatShader.setTextureCoord(new Float32Array([0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0]));
+    flatShader.setTextureUnit(0);
+    flatShader.use();
 
     const texture = gl.createTexture();
     if (!texture) {
@@ -102,7 +41,8 @@ export class VideoFileInputSource implements IFileInputSourceClass {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.uniform1i(textureUniformLocation, 0);
+
+    this.yanvas = yanvas;
 
     this._canvasEl = canvasEl;
     this.gl = gl;
@@ -130,6 +70,18 @@ export class VideoFileInputSource implements IFileInputSourceClass {
     return container.metadata.videoStream.displayHeight;
   }
 
+  public get currentTime() {
+    return this._currentTime;
+  }
+
+  public get duration() {
+    return this._duration;
+  }
+
+  public set onFrameUpdate(func: typeof this._onFrameUpdate) {
+    this._onFrameUpdate = func;
+  }
+
   public loadFile = async (file: Blob) => {
     const ContainerClass = MIME_TYPE_TO_CONTAINER_CLASS_MAP[file.type];
     if (!ContainerClass) {
@@ -152,45 +104,54 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
     this.container = container;
     this.videoDecoder = decoder;
+    this._currentTime = 0;
+    this._duration = container.metadata.duration / container.metadata.timeScale;
   };
 
   public play = () => {
-    const { container, videoDecoder } = this;
+    const { container, videoDecoder, yanvas } = this;
 
     if (!container || !videoDecoder) {
       return;
     }
 
-    window.clearInterval(this.timer);
+    yanvas.stop();
 
     let frameIndex = 0;
     const framesCount = container.metadata.videoStream.framesMap.length;
-    const frameDuration = (1000 * container.metadata.videoStream.frameDuration) / container.metadata.videoStream.timeScale;
+    const fps = container.metadata.videoStream.timeScale / container.metadata.videoStream.frameDuration;
 
-    this.timer = window.setInterval(async () => {
+    yanvas.drawFunction = async () => {
       const videoChunk = await container.getVideoFrameAtIndex(frameIndex);
       videoDecoder.decode(videoChunk);
 
       this.render(container, videoDecoder);
 
       frameIndex = (frameIndex + 1) % framesCount;
-    }, frameDuration);
+      this._currentTime = videoChunk.timestamp / 1000000;
+      this._onFrameUpdate();
+    };
+    yanvas.fps = fps;
+
+    yanvas.start();
   };
 
   public pause = () => {
-    window.clearInterval(this.timer);
+    this.yanvas.stop();
   };
 
   private render = (container: InstanceType<ContainerClassType>, videoDecoder: InstanceType<VideoDecoderClassType>) => {
-    const { gl } = this;
+    const { gl, yanvas } = this;
 
     const videoFrame = videoDecoder.getCurrentFrame();
+    const glCompressedTextureS3tcExtension =
+      yanvas.useGlExtension<WEBGL_compressed_texture_s3tc>("WEBGL_compressed_texture_s3tc");
 
-    if (videoFrame.pixelFormat === "RGB" && videoFrame.pixelCompression === "DXT1" && this.glCompressedTextureS3tcExtension) {
+    if (videoFrame.pixelFormat === "RGB" && videoFrame.pixelCompression === "DXT1" && glCompressedTextureS3tcExtension) {
       gl.compressedTexImage2D(
         gl.TEXTURE_2D,
         0,
-        this.glCompressedTextureS3tcExtension.COMPRESSED_RGB_S3TC_DXT1_EXT,
+        glCompressedTextureS3tcExtension.COMPRESSED_RGB_S3TC_DXT1_EXT,
         container.metadata.videoStream.frameWidth,
         container.metadata.videoStream.frameHeight,
         0,

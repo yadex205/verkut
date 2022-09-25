@@ -15,4 +15,5 @@ await esbuild.build({
   bundle: true,
   minify: true,
   drop: ["console"],
+  watch: true,
 });
