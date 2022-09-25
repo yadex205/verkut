@@ -15,7 +15,9 @@
       "~verkut": ["./src/libs/verkut"],
       "~verkut/*": ["./src/libs/verkut/*"],
       "~verkut-components": ["./src/libs/verkut-components"],
-      "~verkut-components/*": ["./src/libs/verkut-components/*"]
+      "~verkut-components/*": ["./src/libs/verkut-components/*"],
+      "~yanvas": ["./src/libs/yanvas"],
+      "~yanvas/*": ["./src/libs/yanvas/*"]
     },
     "module": "esnext",
     "moduleResolution": "node",
