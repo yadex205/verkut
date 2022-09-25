@@ -1,4 +1,11 @@
 import Snappy from "snappyjs";
+import {
+  IVerkutVideoDecoderClass,
+  PixelCompressionString,
+  PixelFormatString,
+  VerkutEncodedVideoChunk,
+  VerkutVideoFrame,
+} from "~verkut/codecs/interfaces";
 import { ArrayBufferHandler } from "~verkut/utils/array-buffer-handler";
 
 const scanSectionHeader = (handler: ArrayBufferHandler, offset = 0) => {
@@ -20,18 +27,35 @@ const scanSectionHeader = (handler: ArrayBufferHandler, offset = 0) => {
   };
 };
 
-export const parseHapFrame = (buffer: ArrayBuffer) => {
-  const handler = new ArrayBufferHandler(buffer, true);
-  const { sectionType, getBodyHandler } = scanSectionHeader(handler);
+export class HapVideoDecoder implements IVerkutVideoDecoderClass {
+  private frame: ArrayBuffer = new ArrayBuffer(0);
+  private pixelFormat: PixelFormatString = "????";
+  private pixelCompression: PixelCompressionString = "NONE";
 
-  console.log(sectionType);
+  public decode = (chunk: VerkutEncodedVideoChunk) => {
+    const handler = new ArrayBufferHandler(chunk.data, true);
+    const { sectionType, getBodyHandler } = scanSectionHeader(handler);
+    const frameFormat = sectionType & 0x0f;
+    const compression = sectionType & 0xf0;
 
-  switch (sectionType & 0xf0) {
-    case 0xa0:
-      return getBodyHandler().arrayBuffer;
-    case 0xb0:
-      return Snappy.uncompress(getBodyHandler().arrayBuffer);
-    default:
-      return new ArrayBuffer(0);
-  }
-};
+    if (compression === 0xa0) {
+      this.frame = getBodyHandler().arrayBuffer;
+    } else if (compression === 0xb0) {
+      this.frame = Snappy.uncompress(getBodyHandler().arrayBuffer);
+    }
+
+    if (frameFormat === 0x0b) {
+      this.pixelFormat = "RGB";
+      this.pixelCompression = "DXT1";
+    } else if (frameFormat === 0x0e) {
+      this.pixelFormat = "RGBA";
+      this.pixelCompression = "DXT5";
+    }
+  };
+
+  public getCurrentFrame = (): VerkutVideoFrame => ({
+    data: this.frame,
+    pixelFormat: this.pixelFormat,
+    pixelCompression: this.pixelCompression,
+  });
+}

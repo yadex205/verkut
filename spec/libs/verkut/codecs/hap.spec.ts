@@ -1,5 +1,5 @@
-import { parseHapFrame } from "~verkut/codecs/hap";
-import { QtContainer } from "~verkut/containers/qt";
+import { HapVideoDecoder } from "~verkut/codecs/hap";
+import { QtContainer } from "~verkut/containers/qt-container";
 
 const vertexShaderSource = `
   attribute vec2 position;
@@ -28,26 +28,17 @@ describe("decodeVideoFrame", () => {
   describe("when HAP chunk is given", () => {
     it("returns decoded frame", async () => {
       const videoFile = await (await fetch("/spec/samples/hap.mov")).blob();
-      const container = new QtContainer(videoFile);
-      await container.parse();
-
-      const [frameStartsAt, frameEndsAt] = container.metadata?.videoStream?.framesMap?.[15] || [0, 0];
-
-      const rawFrame = await videoFile.slice(frameStartsAt, frameEndsAt).arrayBuffer();
-      const textureData = parseHapFrame(rawFrame);
+      const container = new QtContainer();
+      await container.loadFile(videoFile);
+      const hapDecoder = new HapVideoDecoder();
 
       const canvasEl = document.createElement("canvas");
-      canvasEl.width = 1280;
-      canvasEl.height = 720;
+      canvasEl.width = container.metadata.videoStream.displayWidth;
+      canvasEl.height = container.metadata.videoStream.displayHeight;
       document.body.append(canvasEl);
       const gl = canvasEl.getContext("webgl");
       if (!gl) {
         throw "Cannot obtain WebGL context";
-      }
-
-      const s3tcExtension = gl.getExtension("WEBGL_compressed_texture_s3tc");
-      if (!s3tcExtension) {
-        throw "Cannot obtain S3TC extension";
       }
 
       gl.clearColor(0.5, 0.5, 0.5, 1.0);
@@ -55,7 +46,6 @@ describe("decodeVideoFrame", () => {
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
-      gl.activeTexture(gl.TEXTURE0);
 
       const program = gl.createProgram();
       const vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -75,11 +65,6 @@ describe("decodeVideoFrame", () => {
 
       const positionAttributeLocation = gl.getAttribLocation(program, "position");
       const textureCoordAttributeLocation = gl.getAttribLocation(program, "textureCoord");
-      const textureUniformLocation = gl.getUniformLocation(program, "texture");
-
-      if (!textureUniformLocation) {
-        throw "Cannot obtain uniform location";
-      }
 
       const vertices = [-0.6, -0.6, -0.8, 0.8, 0.8, 0.8, 0.6, -0.6];
       const textureCoord = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0];
@@ -102,25 +87,41 @@ describe("decodeVideoFrame", () => {
 
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-      const texture = gl.createTexture();
-      if (!texture) {
-        throw "Cannot prepare texture";
+      const textureUniformLocation = gl.getUniformLocation(program, "texture");
+      if (!textureUniformLocation) {
+        throw "Cannot obtain uniform location";
       }
 
+      const texture = gl.createTexture();
+      if (!texture) {
+        throw "Cannot prepare a texture";
+      }
+
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+      const videoChunk = await container.getVideoFrameAtTime(1.2);
+      hapDecoder.decode(videoChunk);
+      const videoFrame = hapDecoder.getCurrentFrame();
+      const s3tcExtension = gl.getExtension("WEBGL_compressed_texture_s3tc");
+
+      if (!s3tcExtension) {
+        throw "Cannot obtain S3TC extension";
+      }
+
       gl.compressedTexImage2D(
         gl.TEXTURE_2D,
         0,
         s3tcExtension.COMPRESSED_RGB_S3TC_DXT1_EXT,
-        1280,
-        720,
+        videoChunk.frameWidth,
+        videoChunk.frameHeight,
         0,
-        new Uint8Array(textureData)
+        new Uint8Array(videoFrame.data)
       );
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
+
       gl.uniform1i(textureUniformLocation, 0);
 
       gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
