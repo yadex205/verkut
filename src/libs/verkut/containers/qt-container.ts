@@ -670,6 +670,7 @@ export class QtContainer implements IContainerClass {
     return {
       type: "key",
       timestamp: Math.trunc((frameDuration * frameIndex * 1000000) / timeScale),
+      frameIndex,
       frameWidth,
       frameHeight,
       data: (await this.file?.slice(frameRange[0], frameRange[1])?.arrayBuffer()) || EMPTY_ARRAY_BUFFER,
@@ -679,6 +680,13 @@ export class QtContainer implements IContainerClass {
   public getVideoFrameAtTime = async (time: number): Promise<VerkutEncodedVideoChunk> => {
     const { timeScale, frameDuration, framesMap } = this._metadata.videoStream;
     const frameIndex = Math.min(framesMap.length - 1, Math.max(0, Math.trunc((time * timeScale) / frameDuration)));
+
+    return await this.getVideoFrameAtIndex(frameIndex);
+  };
+
+  public getVideoFileAtRatio = async (ratio: number): Promise<VerkutEncodedVideoChunk> => {
+    const { framesMap } = this._metadata.videoStream;
+    const frameIndex = Math.trunc(framesMap.length * Math.min(1, Math.max(0, ratio)));
 
     return await this.getVideoFrameAtIndex(frameIndex);
   };

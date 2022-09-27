@@ -21,4 +21,5 @@ export interface IContainerClass {
   loadFile: (file: Blob) => void;
   getVideoFrameAtIndex: (index: number) => Promise<VerkutEncodedVideoChunk>;
   getVideoFrameAtTime: (time: number) => Promise<VerkutEncodedVideoChunk>;
+  getVideoFrameAtRatio: (ratio: number) => Promise<VerkutEncodedVideoChunk>;
 }

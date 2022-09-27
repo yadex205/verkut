@@ -6,12 +6,14 @@ import { FlatShader } from "~yanvas/shaders/flat-shader";
 
 const LOGGER_PREFIX = "[verkut/input-sources/video-file]";
 
+// @TODO Support video with non-I frames
 export class VideoFileInputSource implements IFileInputSourceClass {
   private container?: InstanceType<ContainerClassType>;
   private videoDecoder?: InstanceType<VideoDecoderClassType>;
   private _canvasEl: HTMLCanvasElement;
   private gl: WebGLRenderingContext;
   private yanvas: Yanvas;
+  private _currentFrameIndex = 0;
   private _currentTime = 0;
   private _duration = 0;
   private _onFrameUpdate: () => void = () => {};
@@ -117,17 +119,16 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
     yanvas.stop();
 
-    let frameIndex = 0;
     const framesCount = container.metadata.videoStream.framesMap.length;
     const fps = container.metadata.videoStream.timeScale / container.metadata.videoStream.frameDuration;
 
     yanvas.drawFunction = async () => {
-      const videoChunk = await container.getVideoFrameAtIndex(frameIndex);
+      const videoChunk = await container.getVideoFrameAtIndex(this._currentFrameIndex);
       videoDecoder.decode(videoChunk);
 
       this.render(container, videoDecoder);
 
-      frameIndex = (frameIndex + 1) % framesCount;
+      this._currentFrameIndex = (this._currentFrameIndex + 1) % framesCount;
       this._currentTime = videoChunk.timestamp / 1000000;
       this._onFrameUpdate();
     };
@@ -138,6 +139,37 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
   public pause = () => {
     this.yanvas.stop();
+  };
+
+  public seekToRatio = async (targetRatio: number) => {
+    const { container, videoDecoder } = this;
+
+    if (!container || !videoDecoder) {
+      return;
+    }
+
+    const framesCount = container.metadata.videoStream.framesMap.length;
+    const videoChunk = await container.getVideoFileAtRatio(targetRatio);
+    videoDecoder.decode(videoChunk);
+
+    this.render(container, videoDecoder);
+
+    this._currentFrameIndex = (videoChunk.frameIndex + 1) % framesCount;
+    this._currentTime = videoChunk.timestamp / 1000000;
+    this._onFrameUpdate();
+  };
+
+  public stop = () => {
+    const { gl } = this;
+
+    this.yanvas.stop();
+    this._currentFrameIndex = 0;
+    this._currentTime = 0;
+
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.flush();
+
+    this._onFrameUpdate();
   };
 
   private render = (container: InstanceType<ContainerClassType>, videoDecoder: InstanceType<VideoDecoderClassType>) => {

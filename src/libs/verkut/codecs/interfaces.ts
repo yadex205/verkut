@@ -4,6 +4,7 @@ export type PixelCompressionString = "NONE" | "DXT1" | "DXT5";
 export interface VerkutEncodedVideoChunk {
   type: "key" | "delta";
   timestamp: number;
+  frameIndex: number;
   frameWidth: number;
   frameHeight: number;
   data: ArrayBuffer;

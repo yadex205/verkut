@@ -118,6 +118,19 @@ export class VerkutDemoHap1Player extends LitElement {
 
     playerWrapperEl.appendChild(this.videoFileInputSource.canvasEl);
     seekBarEl.valueAsNumber = 0;
+
+    seekBarEl.addEventListener("mousedown", () => {
+      this.videoFileInputSource.pause();
+    });
+
+    seekBarEl.addEventListener("input", (event) => {
+      const targetRatio = (event.currentTarget as HTMLInputElement).valueAsNumber / 100;
+      this.videoFileInputSource.seekToRatio(targetRatio);
+    });
+
+    seekBarEl.addEventListener("mouseup", () => {
+      this.videoFileInputSource.play();
+    });
   }
 
   override render() {
@@ -172,7 +185,7 @@ export class VerkutDemoHap1Player extends LitElement {
       return;
     }
 
-    this.videoFileInputSource.pause();
+    this.videoFileInputSource.stop();
     await this.videoFileInputSource.loadFile(file);
     this.fileName = file.name;
     this.displayWidth = this.videoFileInputSource.displayWidth;

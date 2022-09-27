@@ -9,3 +9,7 @@ export interface IInputSourceClass {
 export interface IFileInputSourceClass extends IInputSourceClass {
   loadFile: (file: Blob) => Promise<void>;
 }
+
+export interface IVideoFileInputSourceClass extends IFileInputSourceClass {
+  seekToRatio: (targetRatio: number) => Promise<void>;
+}
