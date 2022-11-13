@@ -87,14 +87,16 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   public loadFile = async (file: Blob) => {
     const ContainerClass = MIME_TYPE_TO_CONTAINER_CLASS_MAP[file.type];
     if (!ContainerClass) {
-      throw `${LOGGER_PREFIX} Unsupported MIME type "${file.type}"`;
+      console.warn(`${LOGGER_PREFIX} Unsupported MIME type "${file.type}"`);
+      return false;
     }
     const container = new ContainerClass();
     await container.loadFile(file);
 
     const DecoderClass = FOUR_CC_TO_DECODER_CLASS_MAP[container.metadata.videoStream.codecFourCc];
     if (!DecoderClass) {
-      throw `${LOGGER_PREFIX} Unsupported codec "${container.metadata.videoStream.codecFourCc}"`;
+      console.warn(`${LOGGER_PREFIX} Unsupported codec "${container.metadata.videoStream.codecFourCc}"`);
+      return false;
     }
     const decoder = new DecoderClass();
 
@@ -108,6 +110,8 @@ export class VideoFileInputSource implements IFileInputSourceClass {
     this.videoDecoder = decoder;
     this._currentTime = 0;
     this._duration = container.metadata.duration / container.metadata.timeScale;
+
+    return true;
   };
 
   public play = () => {

@@ -7,7 +7,7 @@ export interface IInputSourceClass {
 }
 
 export interface IFileInputSourceClass extends IInputSourceClass {
-  loadFile: (file: Blob) => Promise<void>;
+  loadFile: (file: Blob) => Promise<boolean>;
 }
 
 export interface IVideoFileInputSourceClass extends IFileInputSourceClass {
