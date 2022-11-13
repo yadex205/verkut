@@ -1,3 +1,4 @@
+// @TODO: Consider having `onFrameUpdate`
 export interface IInputSourceClass {
   canvasEl: HTMLCanvasElement;
   displayWidth: number;
