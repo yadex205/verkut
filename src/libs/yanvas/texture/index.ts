@@ -72,6 +72,10 @@ export class Texture {
     this._unitNumber = unitNumber;
   }
 
+  public get rawGlTexture() {
+    return this.texture;
+  }
+
   public get unitNumber() {
     return this._unitNumber;
   }
