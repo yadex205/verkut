@@ -3,7 +3,7 @@ type DrawFunctionType = () => void | Promise<void>;
 export class Yanvas {
   private gl: WebGL2RenderingContext;
   private glExtensions: Record<string, unknown> = {};
-  private _fps = 1;
+  private _fps = 60;
   private _drawFunction: DrawFunctionType = () => {};
   private timerHandle = 0;
   private animationFrameHandle = 0;
