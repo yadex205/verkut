@@ -1,7 +1,7 @@
 type DrawFunctionType = () => void | Promise<void>;
 
 export class Yanvas {
-  private gl: WebGLRenderingContext;
+  private gl: WebGL2RenderingContext;
   private glExtensions: Record<string, unknown> = {};
   private _fps = 1;
   private _drawFunction: DrawFunctionType = () => {};
@@ -9,7 +9,7 @@ export class Yanvas {
   private animationFrameHandle = 0;
   private isPlaying = false;
 
-  public constructor(gl: WebGLRenderingContext) {
+  public constructor(gl: WebGL2RenderingContext) {
     gl.clearColor(0.0, 0.0, 0.0, 0.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 

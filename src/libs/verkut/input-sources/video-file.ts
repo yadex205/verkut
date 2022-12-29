@@ -11,7 +11,7 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   private container?: InstanceType<ContainerClassType>;
   private videoDecoder?: InstanceType<VideoDecoderClassType>;
   private _canvasEl: HTMLCanvasElement;
-  private gl: WebGLRenderingContext;
+  private gl: WebGL2RenderingContext;
   private yanvas: Yanvas;
   private _currentFrameIndex = 0;
   private _currentTime = 0;
@@ -20,9 +20,9 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
   public constructor() {
     const canvasEl = document.createElement("canvas");
-    const gl = canvasEl.getContext("webgl");
+    const gl = canvasEl.getContext("webgl2");
     if (!gl) {
-      throw `${LOGGER_PREFIX} Cannot obtain WebGL context`;
+      throw `${LOGGER_PREFIX} Cannot obtain WebGL2 context`;
     }
 
     const yanvas = new Yanvas(gl);

@@ -1,6 +1,6 @@
 const LOGGER_PREFIX = "[yanvas/shaders/utils]";
 
-export const createProgram = (gl: WebGLRenderingContext, vertexShaderSource: string, fragmentShaderSource: string) => {
+export const createProgram = (gl: WebGL2RenderingContext, vertexShaderSource: string, fragmentShaderSource: string) => {
   const program = gl.createProgram();
   if (!program) {
     throw `${LOGGER_PREFIX} Cannot create shader program`;

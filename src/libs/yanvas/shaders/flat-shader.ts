@@ -26,7 +26,7 @@ const fragmentShaderSource = `
 `;
 
 export class FlatShader {
-  private gl: WebGLRenderingContext;
+  private gl: WebGL2RenderingContext;
   private program: WebGLProgram;
   private positionAttributeLocation: number;
   private textureCoordAttributeLocation: number;
@@ -34,7 +34,7 @@ export class FlatShader {
   private positionAttributeVbo: WebGLBuffer;
   private textureCoordAttributeVbo: WebGLBuffer;
 
-  public constructor(gl: WebGLRenderingContext) {
+  public constructor(gl: WebGL2RenderingContext) {
     const program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
     const positionAttributeLocation = gl.getAttribLocation(program, "position");
     const textureCoordAttributeLocation = gl.getAttribLocation(program, "textureCoord");
