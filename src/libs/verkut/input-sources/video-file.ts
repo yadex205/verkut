@@ -3,6 +3,7 @@ import { ContainerClassType, MIME_TYPE_TO_CONTAINER_CLASS_MAP } from "~verkut/co
 import { IFileInputSourceClass } from "~verkut/input-sources/interfaces";
 import { Yanvas } from "~yanvas";
 import { FlatShader } from "~yanvas/shaders/flat-shader";
+import { Texture } from "~yanvas/texture";
 
 const LOGGER_PREFIX = "[verkut/input-sources/video-file]";
 
@@ -13,6 +14,7 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   private _canvasEl: HTMLCanvasElement;
   private gl: WebGL2RenderingContext;
   private yanvas: Yanvas;
+  private texture: Texture;
   private _currentFrameIndex = 0;
   private _currentTime = 0;
   private _duration = 0;
@@ -27,24 +29,15 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
     const yanvas = new Yanvas(gl);
     const flatShader = new FlatShader(gl);
+    const texture = new Texture(gl, 0);
 
     flatShader.setVertices(new Float32Array([-1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, -1.0, 0.0]));
     flatShader.setTextureCoord(new Float32Array([0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0]));
     flatShader.setTextureUnit(0);
     flatShader.use();
 
-    const texture = gl.createTexture();
-    if (!texture) {
-      throw "Cannot prepare a texture";
-    }
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
     this.yanvas = yanvas;
+    this.texture = texture;
 
     this._canvasEl = canvasEl;
     this.gl = gl;
@@ -177,21 +170,16 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   };
 
   private render = (container: InstanceType<ContainerClassType>, videoDecoder: InstanceType<VideoDecoderClassType>) => {
-    const { gl, yanvas } = this;
+    const { gl } = this;
 
     const videoFrame = videoDecoder.getCurrentFrame();
-    const glCompressedTextureS3tcExtension =
-      yanvas.useGlExtension<WEBGL_compressed_texture_s3tc>("WEBGL_compressed_texture_s3tc");
 
-    if (videoFrame.pixelFormat === "RGB" && videoFrame.pixelCompression === "DXT1" && glCompressedTextureS3tcExtension) {
-      gl.compressedTexImage2D(
-        gl.TEXTURE_2D,
-        0,
-        glCompressedTextureS3tcExtension.COMPRESSED_RGB_S3TC_DXT1_EXT,
+    if (videoFrame.pixelFormat === "RGB" && videoFrame.pixelCompression === "DXT1") {
+      this.texture.setCompressedImage(
+        videoFrame.data,
+        Texture.COMPRESSED_RGB_S3TC_DXT1,
         container.metadata.videoStream.frameWidth,
-        container.metadata.videoStream.frameHeight,
-        0,
-        new Uint8Array(videoFrame.data)
+        container.metadata.videoStream.frameHeight
       );
     }
 
