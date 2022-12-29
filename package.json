@@ -26,7 +26,7 @@
     "@types/chai": "^4.3.3",
     "@types/jest": "^29.0.1",
     "@types/node": "^18.7.17",
-    "@web/test-runner": "^0.14.0",
+    "@web/test-runner": "^0.14.1",
     "@web/test-runner-commands": "^0.6.5",
     "@web/test-runner-playwright": "^0.8.10",
     "concurrently": "^7.6.0",
