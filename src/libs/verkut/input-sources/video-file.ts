@@ -29,11 +29,11 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
     const yanvas = new Yanvas(gl);
     const flatShader = new FlatShader(gl);
-    const texture = new Texture(gl, 0);
+    const texture = Texture.create(gl);
 
     flatShader.setVertices(new Float32Array([-1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, -1.0, 0.0]));
     flatShader.setTextureCoord(new Float32Array([0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0]));
-    flatShader.setTextureUnit(0);
+    flatShader.setTextureUnit(texture.unitNumber);
     flatShader.use();
 
     this.yanvas = yanvas;
@@ -176,10 +176,10 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
     if (videoFrame.pixelFormat === "RGB" && videoFrame.pixelCompression === "DXT1") {
       this.texture.setCompressedImage(
-        videoFrame.data,
         Texture.COMPRESSED_RGB_S3TC_DXT1,
         container.metadata.videoStream.frameWidth,
-        container.metadata.videoStream.frameHeight
+        container.metadata.videoStream.frameHeight,
+        new Uint8Array(videoFrame.data)
       );
     }
 
