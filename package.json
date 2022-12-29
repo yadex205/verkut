@@ -1,7 +1,8 @@
 {
   "name": "verkut",
   "version": "0.0.0",
-  "description": "Do VJing on the Web",
+  "description": "Mix visuals on your browser",
+  "private": true,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yadex205/verkut.git"
@@ -12,7 +13,7 @@
     "url": "https://github.com/yadex205/verkut/issues"
   },
   "type": "module",
-  "homepage": "https://github.com/yadex205/verkut#readme",
+  "homepage": "https://verkut.yadex205.com",
   "scripts": {
     "build": "node scripts/build.js",
     "test": "concurrently -m 1 \"npm:test:build\" \"npm:test:run\"",
