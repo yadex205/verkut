@@ -2,7 +2,6 @@ import { FOUR_CC_TO_DECODER_CLASS_MAP, VideoDecoderClassType } from "~verkut/cod
 import { ContainerClassType, MIME_TYPE_TO_CONTAINER_CLASS_MAP } from "~verkut/containers";
 import { IFileInputSourceClass } from "~verkut/input-sources/interfaces";
 import { Yanvas } from "~yanvas";
-import { FlatShader } from "~yanvas/shaders/flat-shader";
 import { Texture } from "~yanvas/texture";
 
 const LOGGER_PREFIX = "[verkut/input-sources/video-file]";
@@ -11,8 +10,6 @@ const LOGGER_PREFIX = "[verkut/input-sources/video-file]";
 export class VideoFileInputSource implements IFileInputSourceClass {
   private container?: InstanceType<ContainerClassType>;
   private videoDecoder?: InstanceType<VideoDecoderClassType>;
-  private _canvasEl: HTMLCanvasElement;
-  private gl: WebGL2RenderingContext;
   private yanvas: Yanvas;
   private texture: Texture;
   private _currentFrameIndex = 0;
@@ -20,16 +17,9 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   private _duration = 0;
   private _onFrameUpdate: () => void = () => {};
 
-  public constructor() {
-    const canvasEl = document.createElement("canvas");
-    const gl = canvasEl.getContext("webgl2");
-    if (!gl) {
-      throw `${LOGGER_PREFIX} Cannot obtain WebGL2 context`;
-    }
-
-    const yanvas = new Yanvas(gl);
-    const flatShader = new FlatShader(gl);
-    const texture = Texture.create(gl);
+  public constructor(yanvas: Yanvas) {
+    const flatShader = yanvas.createFlatShader();
+    const texture = yanvas.createTexture();
 
     flatShader.setVertices(new Float32Array([-1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, -1.0, 0.0]));
     flatShader.setTextureCoord(new Float32Array([0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0]));
@@ -38,13 +28,6 @@ export class VideoFileInputSource implements IFileInputSourceClass {
 
     this.yanvas = yanvas;
     this.texture = texture;
-
-    this._canvasEl = canvasEl;
-    this.gl = gl;
-  }
-
-  public get canvasEl() {
-    return this._canvasEl;
   }
 
   public get displayWidth() {
@@ -93,10 +76,13 @@ export class VideoFileInputSource implements IFileInputSourceClass {
     }
     const decoder = new DecoderClass();
 
-    const { _canvasEl, gl } = this;
+    const {
+      yanvas: { rawGlContext: gl },
+    } = this;
+    const canvasEl = gl.canvas;
 
-    _canvasEl.width = container.metadata.videoStream.displayWidth;
-    _canvasEl.height = container.metadata.videoStream.displayHeight;
+    canvasEl.width = container.metadata.videoStream.displayWidth;
+    canvasEl.height = container.metadata.videoStream.displayHeight;
     gl.viewport(0, 0, container.metadata.videoStream.displayWidth, container.metadata.videoStream.displayHeight);
 
     this.container = container;
@@ -157,7 +143,9 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   };
 
   public stop = () => {
-    const { gl } = this;
+    const {
+      yanvas: { rawGlContext: gl },
+    } = this;
 
     this.yanvas.stop();
     this._currentFrameIndex = 0;
@@ -170,7 +158,9 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   };
 
   private render = (container: InstanceType<ContainerClassType>, videoDecoder: InstanceType<VideoDecoderClassType>) => {
-    const { gl } = this;
+    const {
+      yanvas: { rawGlContext: gl },
+    } = this;
 
     const videoFrame = videoDecoder.getCurrentFrame();
 

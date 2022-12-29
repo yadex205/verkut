@@ -1,5 +1,9 @@
 type DrawFunctionType = () => void | Promise<void>;
 
+import { Renderer } from "~yanvas/renderer";
+import { FlatShader } from "~yanvas/shaders/flat-shader";
+import { Texture } from "~yanvas/texture";
+
 export class Yanvas {
   private gl: WebGL2RenderingContext;
   private glExtensions: Record<string, unknown> = {};
@@ -14,6 +18,10 @@ export class Yanvas {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     this.gl = gl;
+  }
+
+  public get rawGlContext() {
+    return this.gl;
   }
 
   public set fps(value: number) {
@@ -37,6 +45,18 @@ export class Yanvas {
 
     return extension as T | null;
   }
+
+  public createRenderer = (width: number, height: number) => {
+    return new Renderer(this.gl, width, height);
+  };
+
+  public createFlatShader = () => {
+    return new FlatShader(this.gl);
+  };
+
+  public createTexture = () => {
+    return Texture.create(this.gl);
+  };
 
   public start = () => {
     if (this.isPlaying) {

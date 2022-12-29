@@ -2,12 +2,15 @@ import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { createRef, ref, Ref } from "lit/directives/ref.js";
 import { VideoFileInputSource } from "~verkut/input-sources/video-file";
+import { Yanvas } from "~yanvas";
 
 @customElement("verkut-demo-hap1-player")
 export class VerkutDemoHap1Player extends LitElement {
   private playerWrapperElRef: Ref<HTMLDivElement> = createRef();
+  private playerElRef: Ref<HTMLCanvasElement> = createRef();
   private seekBarElRef: Ref<HTMLInputElement> = createRef();
-  private videoFileInputSource = new VideoFileInputSource();
+  private yanvas?: Yanvas;
+  private videoFileInputSource?: VideoFileInputSource;
 
   @state()
   private fileName = "Drag&Drop a video file to this screen";
@@ -110,33 +113,43 @@ export class VerkutDemoHap1Player extends LitElement {
   `;
 
   override firstUpdated() {
-    const playerWrapperEl = this.playerWrapperElRef.value;
+    const playerEl = this.playerElRef.value;
     const seekBarEl = this.seekBarElRef.value;
-    if (!playerWrapperEl || !seekBarEl) {
+    if (!playerEl || !seekBarEl) {
       return;
     }
 
-    playerWrapperEl.appendChild(this.videoFileInputSource.canvasEl);
+    const gl = playerEl.getContext("webgl2");
+
+    if (!gl) {
+      return;
+    }
+
+    this.yanvas = new Yanvas(gl);
+    this.videoFileInputSource = new VideoFileInputSource(this.yanvas);
+
     seekBarEl.valueAsNumber = 0;
 
     seekBarEl.addEventListener("mousedown", () => {
-      this.videoFileInputSource.pause();
+      this!.videoFileInputSource!.pause();
     });
 
     seekBarEl.addEventListener("input", (event) => {
       const targetRatio = (event.currentTarget as HTMLInputElement).valueAsNumber / 100;
-      this.videoFileInputSource.seekToRatio(targetRatio);
+      this!.videoFileInputSource!.seekToRatio(targetRatio);
     });
 
     seekBarEl.addEventListener("mouseup", () => {
-      this.videoFileInputSource.play();
+      this!.videoFileInputSource!.play();
     });
   }
 
   override render() {
     return html`
       <div class="file-receiver" @drop="${this.dropHandler}" @dragover="${this.dragoverHandler}">
-        <div class="player-wrapper" ${ref(this.playerWrapperElRef)}></div>
+        <div class="player-wrapper" ${ref(this.playerWrapperElRef)}>
+          <canvas class="player" ${ref(this.playerElRef)}></canvas>
+        </div>
         <div class="control-bar-wrapper">
           <div class="control-bar">
             <div class="file-summary">
@@ -180,24 +193,28 @@ export class VerkutDemoHap1Player extends LitElement {
   private playFile = async (file: File) => {
     const playerWrapperEl = this.playerWrapperElRef.value;
     const seekBarEl = this.seekBarElRef.value;
+    const videoFileInputSource = this.videoFileInputSource;
 
-    if (!playerWrapperEl || !seekBarEl) {
+    if (!playerWrapperEl || !seekBarEl || !videoFileInputSource) {
       return;
     }
 
-    this.videoFileInputSource.stop();
-    await this.videoFileInputSource.loadFile(file);
+    videoFileInputSource.stop();
+    await videoFileInputSource.loadFile(file);
+
     this.fileName = file.name;
-    this.displayWidth = this.videoFileInputSource.displayWidth;
-    this.displayHeight = this.videoFileInputSource.displayHeight;
-    this.currentTime = Math.trunc(this.videoFileInputSource.currentTime);
-    this.duration = Math.trunc(this.videoFileInputSource.duration);
+    this.displayWidth = videoFileInputSource.displayWidth;
+    this.displayHeight = videoFileInputSource.displayHeight;
+    this.currentTime = Math.trunc(videoFileInputSource.currentTime);
+    this.duration = Math.trunc(videoFileInputSource.duration);
+
     seekBarEl.valueAsNumber = 0;
-    this.videoFileInputSource.onFrameUpdate = () => {
-      this.currentTime = Math.trunc(this.videoFileInputSource.currentTime);
-      seekBarEl.valueAsNumber = (this.videoFileInputSource.currentTime / this.videoFileInputSource.duration) * 100;
+    videoFileInputSource.onFrameUpdate = () => {
+      this.currentTime = Math.trunc(videoFileInputSource.currentTime);
+      seekBarEl.valueAsNumber = (videoFileInputSource.currentTime / videoFileInputSource.duration) * 100;
     };
     playerWrapperEl.style.aspectRatio = `${this.displayWidth} / ${this.displayHeight}`;
-    this.videoFileInputSource.play();
+
+    videoFileInputSource.play();
   };
 }
