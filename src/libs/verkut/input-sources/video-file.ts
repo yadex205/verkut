@@ -2,6 +2,7 @@ import { FOUR_CC_TO_DECODER_CLASS_MAP, VideoDecoderClassType } from "~verkut/cod
 import { ContainerClassType, MIME_TYPE_TO_CONTAINER_CLASS_MAP } from "~verkut/containers";
 import { IFileInputSourceClass } from "~verkut/input-sources/interfaces";
 import { Yanvas } from "~yanvas";
+import { Geometry } from "~yanvas/geometry";
 import { Texture } from "~yanvas/texture";
 
 const LOGGER_PREFIX = "[verkut/input-sources/video-file]";
@@ -12,6 +13,7 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   private videoDecoder?: InstanceType<VideoDecoderClassType>;
   private yanvas: Yanvas;
   private texture: Texture;
+  private rect: Geometry;
   private _currentFrameIndex = 0;
   private _currentTime = 0;
   private _duration = 0;
@@ -20,14 +22,14 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   public constructor(yanvas: Yanvas) {
     const flatShader = yanvas.createFlatShader();
     const texture = yanvas.createTexture();
+    const rect = yanvas.createRect(2);
 
-    flatShader.setVertices(new Float32Array([-1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, -1.0, 0.0]));
-    flatShader.setTextureCoord(new Float32Array([0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0]));
+    yanvas.useShader(flatShader);
     flatShader.setTextureUnit(texture.unitNumber);
-    flatShader.use();
 
     this.yanvas = yanvas;
     this.texture = texture;
+    this.rect = rect;
   }
 
   public get displayWidth() {
@@ -143,24 +145,19 @@ export class VideoFileInputSource implements IFileInputSourceClass {
   };
 
   public stop = () => {
-    const {
-      yanvas: { rawGlContext: gl },
-    } = this;
+    const { yanvas } = this;
 
     this.yanvas.stop();
     this._currentFrameIndex = 0;
     this._currentTime = 0;
 
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.flush();
+    yanvas.clear();
 
     this._onFrameUpdate();
   };
 
   private render = (container: InstanceType<ContainerClassType>, videoDecoder: InstanceType<VideoDecoderClassType>) => {
-    const {
-      yanvas: { rawGlContext: gl },
-    } = this;
+    const { yanvas, rect } = this;
 
     const videoFrame = videoDecoder.getCurrentFrame();
 
@@ -173,7 +170,6 @@ export class VideoFileInputSource implements IFileInputSourceClass {
       );
     }
 
-    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-    gl.flush();
+    yanvas.drawGeometry(rect);
   };
 }

@@ -1,3 +1,4 @@
+import { IShader } from "~yanvas/shaders/interfaces";
 import { createProgram } from "~yanvas/shaders/utils";
 
 const LOGGER_PREFIX = "[yanvas/shaders/flat-shader]";
@@ -25,14 +26,12 @@ const fragmentShaderSource = `
   }
 `;
 
-export class FlatShader {
+export class FlatShader implements IShader {
   private gl: WebGL2RenderingContext;
   private program: WebGLProgram;
   private positionAttributeLocation: number;
   private textureCoordAttributeLocation: number;
   private textureUniformLocation: WebGLUniformLocation;
-  private positionAttributeVbo: WebGLBuffer;
-  private textureCoordAttributeVbo: WebGLBuffer;
 
   public constructor(gl: WebGL2RenderingContext) {
     const program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
@@ -44,16 +43,6 @@ export class FlatShader {
       throw `${LOGGER_PREFIX} Cannot obtain uniform location "texture"`;
     }
 
-    const positionAttributeVbo = gl.createBuffer();
-    if (!positionAttributeVbo) {
-      throw `${LOGGER_PREFIX} Cannot create position attribute VBO`;
-    }
-
-    const textureCoordAttributeVbo = gl.createBuffer();
-    if (!textureCoordAttributeVbo) {
-      throw `${LOGGER_PREFIX} Cannot create textureCoord attribute VBO`;
-    }
-
     gl.useProgram(program);
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.enableVertexAttribArray(textureCoordAttributeLocation);
@@ -63,8 +52,6 @@ export class FlatShader {
     this.positionAttributeLocation = positionAttributeLocation;
     this.textureCoordAttributeLocation = textureCoordAttributeLocation;
     this.textureUniformLocation = textureUniformLocation;
-    this.positionAttributeVbo = positionAttributeVbo;
-    this.textureCoordAttributeVbo = textureCoordAttributeVbo;
   }
 
   public use = () => {
@@ -73,21 +60,21 @@ export class FlatShader {
     gl.useProgram(program);
   };
 
-  public setVertices = (data: Float32Array, usage: number = this.gl.STATIC_DRAW) => {
-    const { gl, positionAttributeLocation, positionAttributeVbo } = this;
+  public setVerticesBuffer = (buffer: WebGLBuffer) => {
+    const { gl, positionAttributeLocation } = this;
 
     this.use();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionAttributeVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, data, usage);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.vertexAttribPointer(positionAttributeLocation, 3, gl.FLOAT, false, 0, 0);
   };
 
-  public setTextureCoord = (data: Float32Array, usage: number = this.gl.STATIC_DRAW) => {
-    const { gl, textureCoordAttributeLocation, textureCoordAttributeVbo } = this;
+  public setTextureCoordBuffer = (buffer: WebGLBuffer) => {
+    const { gl, textureCoordAttributeLocation } = this;
 
     this.use();
-    gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordAttributeVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, data, usage);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.vertexAttribPointer(textureCoordAttributeLocation, 2, gl.FLOAT, false, 0, 0);
   };
 
